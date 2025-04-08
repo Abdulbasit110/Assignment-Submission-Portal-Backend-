@@ -159,7 +159,7 @@ const getAllStudents = asyncHandler(async (req, res) => {
         select: "_id username email",
       },
     })
-    .select("_id username email");
+    .select("_id username email isVerified");
   res.status(200).json(students);
 });
 
@@ -466,6 +466,49 @@ const verifyAccount = asyncHandler(async (req, res) => {
   res.status(200).json({ message: "Account verified successfully", role: user.role });
 });
 
+const getUnenrolledStudents = asyncHandler(async (req, res) => {
+  try {
+    const unenrolledStudents = await User.find({
+      role: "student",
+      classes: { $size: 0 }
+    }).select("_id username email");
+
+    if (unenrolledStudents.length > 0) {
+      res.status(200).json(unenrolledStudents);
+    } else {
+      res.status(404).json({ message: "No unenrolled students found" });
+    }
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+});
+
+const setMultipleStudents = asyncHandler(async (req, res) => {
+  try {
+    const { classId, studentIds } = req.body;
+
+    const classObj = await Class.findById(classId);
+
+    if (!classObj) {
+      return res.status(404).json({ message: "Class not found" });
+    }
+
+    for (const studentId of studentIds) {
+      const student = await User.findById(studentId);
+      if (student) {
+        student.classes.push(classObj._id);
+        classObj.students.push(studentId);
+        await student.save();
+        await classObj.save();
+      } else continue;
+    }
+
+    return res.status(200).json({ message: "Students enrolled successfully" });
+  } catch (error) {
+    return res.status(500).json({ message: "Server error", error: error.message });
+  }
+})
+
 export {
   loginUser,
   logoutUser,
@@ -486,4 +529,6 @@ export {
   getStudentByTrainer,
   getStudentsByClass,
   verifyAccount,
+  getUnenrolledStudents,
+  setMultipleStudents,
 };
